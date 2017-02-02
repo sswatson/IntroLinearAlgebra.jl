@@ -22,7 +22,9 @@ else
     sympyexists = false
 end
 
-RatOrInt = sympyexists ? Union{Rational,Integer,SymPy.Sym} : Union{Rational,Integer}
+RatOrInt = Union{Rational,Integer}
+
+RatOrIntOrSym = sympyexists ? Union{Rational,Integer,SymPy.Sym} : RatOrInt
 
 """
     textstring(M)
@@ -70,7 +72,7 @@ julia> rowswitch(M,1,2)
  1//1  2//1  3//1
 ```
 """
-function rowswitch{T<:RatOrInt}(M::Array{T,2},i::Integer,j::Integer)
+function rowswitch{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,j::Integer)
     A = copy(M)
     A[i,:], A[j,:] = A[j,:], A[i,:] 
     return A
@@ -90,7 +92,7 @@ julia> rowscale(M,1,16)
   4   5   6
 ```
 """
-function rowscale{T<:RatOrInt}(M::Array{T,2},i::Integer,x::Real)
+function rowscale{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,x::Real)
     A = copy(M)
     if isa(x,Rational) && issubtype(typeof(M).parameters[1],Integer)
        A = convert(Array{Rational{Int64},2},A)
@@ -113,7 +115,7 @@ julia> rowadd(M,1,2,-1)
   4   5   6
 ```
 """
-function rowadd{T<:RatOrInt}(M::Array{T,2},i::Integer,j::Integer,x::Real)
+function rowadd{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,j::Integer,x::Real)
     A = copy(M)
     if isa(x,Rational) && issubtype(typeof(M).parameters[1],Integer)
        A = convert(Array{Rational{Int64},2},A)
@@ -128,7 +130,7 @@ end
 Version of `rowswitch` that modifies the argument rather than 
 returning a new matrix
 """
-function rowswitch!{T<:RatOrInt}(M::Array{T,2},i::Integer,j::Integer)
+function rowswitch!{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,j::Integer)
     if i == j
         return nothing
     else
@@ -143,7 +145,7 @@ end
 Version of `rowscale` that modifies the argument rather than 
 returning a new matrix
 """
-function rowscale!{T<:RatOrInt}(M::Array{T,2},i::Integer,x::Real)
+function rowscale!{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,x::Real)
     if isa(x,Rational) && issubtype(typeof(M).parameters[1],Integer)
         error("Initialize your matrix with at least one rational number " *
                     "to use rowscale! with a rational, like M = [1//1 2; 3 4]")
@@ -158,7 +160,7 @@ end
 Version of `rowadd` that modifies the argument rather than 
 returning a new matrix
 """
-function rowadd!{T<:RatOrInt}(M::Array{T,2},i::Integer,j::Integer,x::Real)
+function rowadd!{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,j::Integer,x::Real)
     if isa(x,Rational) && issubtype(typeof(M).parameters[1],Integer)
         error("Initialize your matrix with at least one rational number " *
                     "to use rowadd! with a rational, like M = [1//1 2; 3 4]")
@@ -195,7 +197,7 @@ function rref{T<:RatOrInt}(M::Array{T,2};showsteps=false)
     steps = typeof(A)[]
     current_row = 1
     for j=1:size(A,2)
-        if all(A[:,j] .== 0)
+        if all(A[current_row:end,j] .== 0)
             continue
         else
             i = current_row-1 + findfirst(A[current_row:end,j] .!= 0)
@@ -233,7 +235,6 @@ function rref{T<:RatOrInt}(M::Array{T,2};showsteps=false)
     end
 end
 
-
 """
     zerooutbelow!(M,i,j)
 
@@ -248,7 +249,7 @@ julia> M
  3//2  0//1  -3//2
 ```
 """
-function zerooutbelow!{T<:RatOrInt}(M::Array{T,2},i::Integer,j::Integer) # zero out entries below the (i,j)th
+function zerooutbelow!{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,j::Integer) # zero out entries below the (i,j)th
     for k=i+1:size(M,1)
         rowadd!(M,k,i,-M[k,j]//M[i,j])
     end
@@ -271,7 +272,7 @@ julia> M
   4//1  5//1  6//1
 ```
 """
-function zerooutabove!{T<:RatOrInt}(M::Array{T,2},i::Integer,j::Integer)::Void
+function zerooutabove!{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,j::Integer)::Void
     for k=1:i-1
         rowadd!(M,k,i,-M[k,j]//M[i,j])
     end
@@ -293,7 +294,7 @@ julia> M
  1//1  5//4  3//2
 ```
 """
-function normalizerow!{T<:RatOrInt}(M::Array{T,2},i::Integer)::Void
+function normalizerow!{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer)::Void
     j = findfirst(M[i,:] .!= 0)
     rowscale!(M,i,1//M[i,j])
     return nothing
