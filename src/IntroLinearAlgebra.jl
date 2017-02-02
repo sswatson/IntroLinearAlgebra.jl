@@ -15,7 +15,14 @@ export rowswitch,
 
 import Base.show
 
-RatOrInt = Union{Rational,Integer} 
+if Pkg.installed("SymPy") != nothing
+    import SymPy
+    sympyexists = true
+else 
+    sympyexists = false
+end
+
+RatOrInt = sympyexists ? Union{Rational,Integer,SymPy.Sym} : Union{Rational,Integer}
 
 """
     textstring(M)
@@ -48,7 +55,9 @@ function texstring{T<:RatOrInt}(M::Array{T,2})
     return s
 end
 
-show{T<:RatOrInt}(io::IO, ::MIME"text/latex", s::Array{T,2}) = write(io, texstring(s))
+if !sympyexists
+    show{T<:RatOrInt}(io::IO, ::MIME"text/latex", s::Array{T,2}) = write(io, texstring(s))
+end
 
 """
     rowswitch(M,i,j)
@@ -184,7 +193,7 @@ julia> rref(M;showsteps=true)
 ```
 """
 function rref{T<:RatOrInt}(M::Array{T,2};showsteps=false)
-    A = convert(Array{Rational{Int64},2},M)
+    A = copy(convert(Array{Rational{Int64},2},M))
     steps = typeof(A)[]
     current_row = 1
     for j=1:size(A,2)
