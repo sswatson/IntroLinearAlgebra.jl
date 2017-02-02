@@ -55,9 +55,7 @@ function texstring{T<:RatOrInt}(M::Array{T,2})
     return s
 end
 
-if !sympyexists
-    show{T<:RatOrInt}(io::IO, ::MIME"text/latex", s::Array{T,2}) = write(io, texstring(s))
-end
+show{T<:Union{Rational,Integer}}(io::IO, ::MIME"text/latex", s::Array{T,2}) = write(io, texstring(s))
 
 """
     rowswitch(M,i,j)
