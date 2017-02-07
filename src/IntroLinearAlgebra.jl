@@ -86,11 +86,11 @@ function texstring{T<:Real}(M::Array{T,2})
     end
     s = "\$\\left[\\begin{array}{" * repeat("c",size(M,2)) * "}"
     global ALIGNMENT
-    firstcolumnpadding = any(M[:,1] .< -ϵ)
+    columnpadding = any(M .< -ϵ, 1) # checks for negatives in each column
     for i=1:size(M,1)
         for j=1:size(M,2)
-            s *= prettystring(M[i,j],padding=ALIGNMENT &&
-                              (j > 1 || firstcolumnpadding))
+            thiscolumnpadding = any(M[:,j] .< -ϵ)
+            s *= prettystring(M[i,j],padding=ALIGNMENT && columnpadding[j])
             if j < size(M,2)
                 s *= " & "
             end
