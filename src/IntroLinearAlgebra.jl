@@ -11,7 +11,9 @@ export rowswitch,
        rref,
        zerooutabove!,
        zerooutbelow!,
-       normalizerow!
+       normalizerow!,
+       setdigits,
+       setalignment
 
 import Base.show
 
@@ -23,30 +25,72 @@ else
 end
 
 RatOrInt = Union{Rational,Integer}
-
 RatOrIntOrSym = sympyexists ? Union{Rational,Integer,SymPy.Sym} : RatOrInt
+RealOrSym = sympyexists ? Union{Real,SymPy.Sym} : Real
+
+DIGITS = 4
+ALIGNMENT = true
 
 """
-    textstring(M)
+    setdigits(n)
+
+Set the number of digits after the decimal point
+to display, for floating-point matrices
+"""
+function setdigits(n::Integer)
+    global DIGITS
+    DIGITS = n
+end
+
+"""
+    setalignment(b::Bool)
+
+Determine whether to align displayed matrix entries
+disregarding the sign (true) or including the sign (false)
+"""
+function setalignment(b::Bool)
+    global ALIGNMENT
+    ALIGNMENT = b
+end
+
+"""
+    texstring(M)
 
 Return a string for processing by LaTeX to pretty print
 the matrix `M`
 """
-function texstring{T<:RatOrInt}(M::Array{T,2})
-    function prettystring(x::RatOrInt)
+function texstring{T<:Real}(M::Array{T,2})
+    ϵ = T<:RatOrInt ? 0 : eps(norm(M,Inf))
+    function neg(x::Real) # test whether a number is
+                          # genuinely negative (-0.0 isn't)
+        return x < -ϵ
+    end
+    function prettystring(x::RatOrInt;padding=true)
         if isa(x,Integer)
-            return string(x)
+            if padding
+                return neg(x) ? string(x) : "\\hphantom{-}"*string(x)
+            else
+                return string(x)
+            end
         elseif x.den == 1
-            return string(x.num)
+            return prettystring(x.num,padding=padding)
         else
-            sgn = signbit(x.num) ? "-" : ""
+            sgn = neg(x.num) ? "-" : (padding?"\\hphantom{-}":"")
             return sgn*"\\frac{"*string(abs(x.num))*"}{"*string(x.den)*"}"
         end
     end
+    function prettystring(x::Real;padding=true)
+        global DIGITS
+        return (neg(x) ? "-" : (padding ? "\\hphantom{-}" : "")) *
+            string(round(abs(x),DIGITS))
+    end
     s = "\$\\left[\\begin{array}{" * repeat("c",size(M,2)) * "}"
+    global ALIGNMENT
+    firstcolumnpadding = any(M[:,1] .< -ϵ)
     for i=1:size(M,1)
         for j=1:size(M,2)
-            s *= prettystring(M[i,j]) 
+            s *= prettystring(M[i,j],padding=ALIGNMENT &&
+                              (j > 1 || firstcolumnpadding))
             if j < size(M,2)
                 s *= " & "
             end
@@ -57,7 +101,7 @@ function texstring{T<:RatOrInt}(M::Array{T,2})
     return s
 end
 
-show{T<:Union{Rational,Integer}}(io::IO, ::MIME"text/latex", s::Array{T,2}) = write(io, texstring(s))
+show{T<:Real}(io::IO, ::MIME"text/latex", s::Array{T,2}) = write(io, texstring(s))
 
 """
     rowswitch(M,i,j)
@@ -72,7 +116,7 @@ julia> rowswitch(M,1,2)
  1//1  2//1  3//1
 ```
 """
-function rowswitch{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,j::Integer)
+function rowswitch{T<:Real}(M::Array{T,2},i::Integer,j::Integer)
     A = copy(M)
     A[i,:], A[j,:] = A[j,:], A[i,:] 
     return A
@@ -101,6 +145,12 @@ function rowscale{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,x::Real)
     return A
 end
 
+function rowscale{T<:Real}(M::Array{T,2},i::Integer,x::Real)
+    A = copy(M)
+    A[i,:] *= x
+    return A
+end
+
 """
     rowadd(M,i,j,x)
 
@@ -124,13 +174,19 @@ function rowadd{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,j::Integer,x::Real)
     return A
 end
 
+function rowadd{T<:Real}(M::Array{T,2},i::Integer,j::Integer,x::Real)
+    A = copy(M)
+    A[i,:] += x*A[j,:]
+    return A
+end
+
 """
     rowswitch!(M,i,j)
 
 Version of `rowswitch` that modifies the argument rather than 
 returning a new matrix
 """
-function rowswitch!{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,j::Integer)
+function rowswitch!{T<:Real}(M::Array{T,2},i::Integer,j::Integer)
     if i == j
         return nothing
     else
@@ -154,6 +210,11 @@ function rowscale!{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,x::Real)
     return nothing
 end
 
+function rowscale!{T<:Real}(M::Array{T,2},i::Integer,x::Real)
+    M[i,:] *= x
+    return nothing
+end
+
 """
     rowadd!(M,i,j)
 
@@ -167,6 +228,11 @@ function rowadd!{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,j::Integer,x::Real)
     else
         M[i,:] += x*M[j,:]
     end
+    return nothing
+end
+
+function rowadd!{T<:Real}(M::Array{T,2},i::Integer,j::Integer,x::Real)
+    M[i,:] += x*M[j,:]
     return nothing
 end
 
@@ -192,15 +258,18 @@ julia> rref(M;showsteps=true)
  Rational{Int64}[1//1 0//1 -1//1; 0//1 1//1 2//1] 
 ```
 """
-function rref{T<:RatOrInt}(M::Array{T,2};showsteps=false)
-    A = copy(convert(Array{Rational{Int64},2},M))
+function rref{T<:Real}(M::Array{T,2};showsteps=false)
+    A = T<: RatOrInt ? copy(convert(Array{Rational{Int64},2},M)) : copy(M)
+    ϵ = T <: RatOrInt ? 0 : eps(norm(A,Inf)) 
     steps = typeof(A)[]
     current_row = 1
     for j=1:size(A,2)
-        if all(A[current_row:end,j] .== 0)
-            continue
+        if all(abs(A[current_row:end,j]) .≤ ϵ) 
+            if ϵ > 0
+                A[current_row:end,j] = 0
+            end
         else
-            i = current_row-1 + findfirst(A[current_row:end,j] .!= 0)
+            i = current_row-1 + findfirst(abs(A[current_row:end,j]) .> ϵ)
             rowswitch!(A,current_row,i)
             if showsteps push!(steps,copy(A)) end
             zerooutbelow!(A,current_row,j)
@@ -214,16 +283,17 @@ function rref{T<:RatOrInt}(M::Array{T,2};showsteps=false)
         end
     end
     for i=size(A,1):-1:1
-        if all(A[i,:] .== 0)
+        if all(abs(A[i,:]) .≤ ϵ)
             continue
         else
-            j = findfirst(A[i,:] .!= 0) 
+            j = findfirst(abs(A[i,:]) .> ϵ) 
             zerooutabove!(A,i,j)
             if showsteps push!(steps,copy(A)) end
         end
     end
     if showsteps
-        uniquesteps = Array{Rational{Int64},2}[]
+        S = T <: RatOrInt ? Rational{Int64} : T
+        uniquesteps = Array{T,2}[]
         for i=1:length(steps)
             if i == 1 || steps[i] != uniquesteps[end]
                 push!(uniquesteps,steps[i])
@@ -249,9 +319,9 @@ julia> M
  3//2  0//1  -3//2
 ```
 """
-function zerooutbelow!{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,j::Integer) # zero out entries below the (i,j)th
+function zerooutbelow!{T<:RealOrSym}(M::Array{T,2},i::Integer,j::Integer) # zero out entries below the (i,j)th
     for k=i+1:size(M,1)
-        rowadd!(M,k,i,-M[k,j]//M[i,j])
+        rowadd!(M,k,i,T<:RatOrIntOrSym ? -M[k,j]//M[i,j] : -M[k,j]/M[i,j])
     end
     return nothing
 end
@@ -272,9 +342,9 @@ julia> M
   4//1  5//1  6//1
 ```
 """
-function zerooutabove!{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer,j::Integer)::Void
+function zerooutabove!{T<:RealOrSym}(M::Array{T,2},i::Integer,j::Integer)::Void
     for k=1:i-1
-        rowadd!(M,k,i,-M[k,j]//M[i,j])
+        rowadd!(M,k,i,T<:RatOrIntOrSym ? -M[k,j]//M[i,j] : -M[k,j]/M[i,j])
     end
     return nothing
 end
@@ -294,9 +364,10 @@ julia> M
  1//1  5//4  3//2
 ```
 """
-function normalizerow!{T<:RatOrIntOrSym}(M::Array{T,2},i::Integer)::Void
-    j = findfirst(M[i,:] .!= 0)
-    rowscale!(M,i,1//M[i,j])
+function normalizerow!{T<:RealOrSym}(M::Array{T,2},i::Integer)::Void
+    ϵ = T <: RatOrInt ? 0 : eps(norm(M,Inf)) 
+    j = findfirst(abs(M[i,:]) .> ϵ)
+    rowscale!(M,i, T<:RatOrIntOrSym ? 1//M[i,j] : 1/M[i,j])
     return nothing
 end
 
