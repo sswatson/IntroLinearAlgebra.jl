@@ -259,7 +259,7 @@ julia> rref(M;showsteps=true)
 """
 function rref{T}(M::Array{T,2};showsteps=false)
     isnonzero(x) = _isnonzero(x,M)
-    S = T <: Rational ? S.parameters[1] : T
+    S = T <: Rational ? T.parameters[1] : T
     if T <: RatOrInt
         newtype = Rational{S}
     elseif T <: Complex && T.parameters[1] <: Integer
