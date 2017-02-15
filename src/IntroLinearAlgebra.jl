@@ -10,7 +10,8 @@ export rowswitch,
        zerooutbelow!,
        rownormalize!,
        setdigits,
-       setalignment
+       setalignment,
+       transformation_movie
 
 import Base: show, eps
 
@@ -380,5 +381,60 @@ function rownormalize!{T}(M::Array{T,2},i::Integer)::Void
     rowscale!(M,i, T<:RatOrInt ? 1//M[i,j] : 1/M[i,j])
     return nothing
 end
+
+
+function _loadgraphics()
+    try
+        Pkg.installed("Graphics2D")
+    catch
+        error("Run Pkg.clone(\"git://github.com/sswatson/Graphics2D.jl.git\")")
+    end
+    @eval begin
+        import Graphics2D
+    end
+end
+
+"""
+    transformation_movie(A,n;frames=20)
+
+Return an array of Graphics2D arrays which give a dynamic
+picture of how A transforms integer grid lines in [-n,n]^2
+
+```julia
+julia> A = [0 2; -1 0]
+julia> movie = transformation_movie(A,10,20);
+julia> using Interact
+julia> @manipulate for i=1:length(movie)
+           movie[i]
+       end
+```
+"""
+transformation_movie{T}(A::Array{T,2};kwargs...) =
+    transformation_movie((x,y)->A*[x;y];kwargs...)
+
+function transformation_movie(f::Function;
+                              gridlines::Integer=8,
+                              frames::Integer=20)
+
+    n = gridlines
+
+    _loadgraphics()
+
+    Line = Graphics2D.Line
+    Point = Graphics2D.Point
+
+    m = 1.05*max(norm(f(n,n),Inf),norm(f(-n,n),Inf))
+    box = Line([-m -m; m -m; m m; -m m; -m -m];color="white")
+    return [vcat([[Line([(1-t)*[j,k] + t*f(j,k) for j=-n:0.1:n];
+                         linewidth=3,color=0.9*"red") for k=-n:n];
+                   [Line([(1-t)*[j,k] + t*f(j,k) for k=-n:0.1:n];
+                         linewidth=3,color=0.9*"blue") for j=-n:n];
+                   [Point((1-t)*[1,4] + t*f(1,4),
+                          pointsize=1e-2,color=0.5*"green")];
+                  [Point(0,0;pointsize=1e-2)];
+                  [box]]...)
+             for t=linspace(0,1,frames)]
+end
+
 
 end # module
