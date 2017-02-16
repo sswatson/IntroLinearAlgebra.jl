@@ -13,7 +13,11 @@ export rowswitch,
        setalignment,
        transformation_movie
 
-import Base: show, eps
+import Base: show, eps, inv
+
+#-------------------------------------------------------
+# MATRIX TOOLS
+#-------------------------------------------------------
 
 DIGITS = 4
 ALIGNMENT = true
@@ -135,7 +139,7 @@ julia> rowswitch(M,1,2)
 """
 function rowswitch{T}(M::Array{T,2},i::Integer,j::Integer)
     A = copy(M)
-    A[i,:], A[j,:] = A[j,:], A[i,:] 
+    A[i,:], A[j,:] = A[j,:], A[i,:]
     return A
 end
 
@@ -382,6 +386,24 @@ function rownormalize!{T}(M::Array{T,2},i::Integer)::Void
     return nothing
 end
 
+function inv{T<:Integer}(A::Union{Array{Rational{T},2},Array{T,2}})
+    if size(A,1) != size(A,2)
+        error("Matrix not square")
+    end
+    n = size(A,1)
+    I = eye(T,n)
+    E = rref([A I])
+    C,D = E[:,1:n], E[:,n+1:end]
+    if C != I
+        error("Not invertible")
+    else
+        return D
+    end
+end
+
+#----------------------------------------------------------------------------
+# GRAPHICS TOOLS
+#----------------------------------------------------------------------------
 
 function _loadgraphics()
     try
@@ -426,14 +448,14 @@ function transformation_movie(f::Function;
     m = 1.05*max(norm(f(n,n),Inf),norm(f(-n,n),Inf))
     box = Line([-m -m; m -m; m m; -m m; -m -m];color="white")
     return [vcat([[Line([(1-t)*[j,k] + t*f(j,k) for j=-n:0.1:n];
-                         linewidth=3,color=0.9*"red") for k=-n:n];
-                   [Line([(1-t)*[j,k] + t*f(j,k) for k=-n:0.1:n];
-                         linewidth=3,color=0.9*"blue") for j=-n:n];
-                   [Point((1-t)*[1,4] + t*f(1,4),
-                          pointsize=1e-2,color=0.5*"green")];
+                        linewidth=3,color=0.9*"red") for k=-n:n];
+                  [Line([(1-t)*[j,k] + t*f(j,k) for k=-n:0.1:n];
+                        linewidth=3,color=0.9*"blue") for j=-n:n];
+                  [Point((1-t)*[1,4] + t*f(1,4),
+                         pointsize=1e-2,color=0.5*"green")];
                   [Point(0,0;pointsize=1e-2)];
                   [box]]...)
-             for t=linspace(0,1,frames)]
+            for t=linspace(0,1,frames)]
 end
 
 
