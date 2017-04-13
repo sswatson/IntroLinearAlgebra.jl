@@ -6,6 +6,8 @@ export rowswitch,
        rowscale,
        rowadd,
        rref,
+       eigenvalues, 
+       charpoly,
        zerooutabove!,
        zerooutbelow!,
        rownormalize!,
@@ -242,6 +244,14 @@ end
 eps{T}(::Type{Complex{T}}) = 3*eps(T)
 eps{T<:AbstractFloat}(z::Complex{T}) = 3*(eps(z.re) + eps(z.im))
 
+simplify(x) = isa(x,Real) ? x :
+    (string(typeof(x)) == "SymPy.Sym" ? symplify(x) : x)
+
+function symplify(x)
+    _loadsympy()
+    return SymPy.simplify(x)
+end
+
 """
     rref(M;showsteps=false)
 
@@ -297,6 +307,7 @@ function rref{T}(M::Array{T,2};showsteps=false)
                 break
             end
         end
+        map!(simplify,A)
     end
     for i=size(A,1):-1:1
         if ~any(isnonzero.(A[i,:]))
@@ -402,6 +413,56 @@ function inv{T<:Integer}(A::Union{Array{Rational{T},2},Array{T,2}})
 end
 
 #----------------------------------------------------------------------------
+# EIGENSTUFF
+#----------------------------------------------------------------------------
+
+function _loadsympy()
+    try
+        Pkg.installed("SymPy")
+    catch
+        error("Run Pkg.add(\"SymPy\")")
+    end
+    @eval begin
+        import SymPy
+    end
+end
+
+"""
+    eigenvalues(M)
+
+Uses SymPy to find the exact eigenvalues of M
+
+```julia 
+julia> M = [1 2; 4 5]
+julia> eigenvalues(M)
+2-element Array{SymPy.Sym,1}
+⎡3 + 2⋅√3 ⎤
+⎢         ⎥
+⎣-2⋅√3 + 3⎦
+```
+"""
+function eigenvalues{T}(A::Array{T,2})
+    _loadsympy()
+    return SymPy.solve(charpoly(A))
+end
+"""
+    charpoly(M)
+
+Uses SymPy to find the characteristic polynomial of M
+
+```julia 
+julia> M = [1 2; 4 5]
+julia> charpoly(M)
+```
+"""
+function charpoly{T}(A::Array{T,2})
+    _loadsympy()
+    λ = SymPy.symbols("λ")
+    B = map(x->convert(SymPy.Sym,x),A)
+    return SymPy.getindex(B,:charpoly)()(λ)
+end
+
+#----------------------------------------------------------------------------
 # GRAPHICS TOOLS
 #----------------------------------------------------------------------------
 
@@ -457,6 +518,5 @@ function transformation_movie(f::Function;
                   [box]]...)
             for t=linspace(0,1,frames)]
 end
-
 
 end # module
