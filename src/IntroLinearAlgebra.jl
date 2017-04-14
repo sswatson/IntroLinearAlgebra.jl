@@ -6,7 +6,8 @@ export rowswitch,
        rowscale,
        rowadd,
        rref,
-       eigenvalues, 
+       eigenvalues,
+       eigenspaces,
        charpoly,
        zerooutabove!,
        zerooutbelow!,
@@ -125,6 +126,59 @@ show{T<:Complex}(io::IO,
 show{T<:Complex}(io::IO,
                  ::MIME"text/latex",
                  s::Array{T,1}) = write(io, texstring(s))
+
+type EigenSpace
+    λ
+    mult
+    eigenmatrix
+end
+
+function texstring(E::EigenSpace)
+    s = "\\mathrm{eigenspace}\\left("
+    s *= "λ = "
+    s *= SymPy.latex(E.λ,itex=true)*", "
+    s *= "\\mathrm{mult} = "*string(E.mult)*", "
+    s *= "\\mathrm{Col}\\left("
+    io = IOBuffer()
+    show(io,(MIME"text/latex").instance,E.eigenmatrix)
+    s *= takebuf_string(io)
+    s *= "\\right)\\right)"
+end
+
+function show(io::IO,M::MIME"text/latex",E::EigenSpace)
+    write(io,"\$"*texstring(E)*"\$")
+end
+
+function show(io::IO,E::EigenSpace)
+    s = "eigenspace(\n"
+    s *= "λ = "
+    _io = IOBuffer()
+    show(_io,(MIME"text/plain").instance,E.λ)
+    s *= takebuf_string(_io)
+    s *= ", mult = "*string(E.mult)*", "
+    show(_io,E.eigenmatrix)
+    s *= takebuf_string(_io)
+    s *= "\n)"
+    print(io,s)
+end
+
+function show(io::IO,M::MIME"text/latex",A::Array{EigenSpace,1})
+    print(io,"\$\$\\begin{bmatrix}")
+    for E in A
+        write(io,texstring(E))
+        print(io,"\\\\")
+    end
+    print(io,"\\end{bmatrix}\$\$")
+end
+
+function show(io::IO,::MIME"text/plain",A::Array{EigenSpace,1})
+    for (k,E) in enumerate(A)
+        show(io,E)
+        if k < length(A)
+            print(io,"\n\n")
+        end
+    end
+end
 
 """
     rowswitch(M,i,j)
@@ -445,6 +499,41 @@ function eigenvalues{T}(A::Array{T,2})
     _loadsympy()
     return SymPy.solve(charpoly(A))
 end
+
+"""
+    eigenvalues(M)
+
+Uses SymPy to find the exact eigenvalues of M
+
+```julia 
+julia> M = [1 2; 4 5]
+julia> eigenspaces(M)
+eigenspace(
+λ = 3 + 2 \sqrt{3}, mult = 1, 
+⎡  1   √3⎤
+⎢- ─ + ──⎥
+⎢  2   2 ⎥
+⎢        ⎥
+⎣   1    ⎦
+)
+
+eigenspace(
+λ = - 2 \sqrt{3} + 3, mult = 1, 
+⎡  √3   1⎤
+⎢- ── - ─⎥
+⎢  2    2⎥
+⎢        ⎥
+⎣   1    ⎦
+)
+```
+"""
+function eigenspaces{T}(A::Array{T,2})
+    _loadsympy()
+    B = map(x->convert(SymPy.Sym,x),A)
+    return [EigenSpace(a,b,map(SymPy.simplify,hcat(c...))) for
+            (a,b,c) in SymPy.getindex(B,:eigenvects)()]
+end
+
 """
     charpoly(M)
 
