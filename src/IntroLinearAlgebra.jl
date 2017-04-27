@@ -546,7 +546,7 @@ julia> charpoly(M)
 """
 function charpoly{T}(A::Array{T,2})
     _loadsympy()
-    λ = SymPy.symbols("λ")
+    λ = SymPy.symbols("lambda")
     B = map(x->convert(SymPy.Sym,x),A)
     return SymPy.getindex(B,:charpoly)()(λ)
 end
