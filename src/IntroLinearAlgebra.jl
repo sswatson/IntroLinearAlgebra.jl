@@ -141,7 +141,7 @@ function texstring(E::EigenSpace)
     s *= "\\mathrm{Col}\\left("
     io = IOBuffer()
     show(io,(MIME"text/latex").instance,E.eigenmatrix)
-    s *= takebuf_string(io)
+    s *= String(take!(io))
     s *= "\\right)\\right)"
 end
 
@@ -154,10 +154,10 @@ function show(io::IO,E::EigenSpace)
     s *= "λ = "
     _io = IOBuffer()
     show(_io,(MIME"text/plain").instance,E.λ)
-    s *= takebuf_string(_io)
+    s *= String(take!(_io))
     s *= ", mult = "*string(E.mult)*", "
     show(_io,E.eigenmatrix)
-    s *= takebuf_string(_io)
+    s *= String(take!(_io))
     s *= "\n)"
     print(io,s)
 end
@@ -361,7 +361,7 @@ function rref{T}(M::Array{T,2};showsteps=false)
                 break
             end
         end
-        map!(simplify,A)
+        map!(simplify,A,A)
     end
     for i=size(A,1):-1:1
         if ~any(isnonzero.(A[i,:]))
