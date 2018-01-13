@@ -110,6 +110,7 @@ function texstring{T}(M::Array{T,2})
 end
 
 texstring{T<:Real}(M::Array{T,1}) = texstring(reshape(M,(length(M),1)))
+texstring{T<:Real}(M::RowVector{T}) = texstring(convert(Array{T,2},M))
 
 show{T<:Real}(io::IO,
               ::MIME"text/latex",
