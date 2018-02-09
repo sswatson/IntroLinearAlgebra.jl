@@ -28,23 +28,23 @@ ALIGNMENT = true
 RatOrInt = Union{Rational,Integer}
 
 """
-    setdigits(n)
+    setdigits!(n::Integer)
 
-Set the number of digits after the decimal point
-to display, for floating-point matrices
+Set the number of digits (after the decimal point) to 
+display (for matrices with floating-point entries). 
 """
-function setdigits(n::Integer)
+function setdigits!(n::Integer)
     global DIGITS
     DIGITS = n
 end
 
 """
-    setalignment(b::Bool)
+    setalignment!(b::Bool)
 
 Determine whether to align displayed matrix entries
 disregarding the sign (true) or including the sign (false)
 """
-function setalignment(b::Bool)
+function setalignment!(b::Bool)
     global ALIGNMENT
     ALIGNMENT = b
 end
@@ -504,7 +504,7 @@ end
 """
     eigenvalues(M)
 
-Uses SymPy to find the exact eigenvalues of M
+Use SymPy to find the exact eigenvalues of M
 
 ```julia 
 julia> M = [1 2; 4 5]
