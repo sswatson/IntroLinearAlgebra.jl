@@ -2,6 +2,8 @@ __precompile__(true)
 
 module IntroLinearAlgebra
 
+using Pkg, LinearAlgebra
+
 export rowswitch,
        rowscale,
        rowadd,
@@ -14,7 +16,8 @@ export rowswitch,
        rownormalize!,
        setdigits,
        setalignment,
-       transformation_movie
+       transformation_movie,
+       svdviz
 
 import Base: show, eps, inv
 
@@ -55,13 +58,13 @@ end
 Return a string for processing by LaTeX to pretty print
 the matrix `M`
 """
-function texstring{T}(M::Array{T,2})
+function texstring(M::Array{T,2}) where T 
     ϵ = T<:RatOrInt ? 0 : eps(norm(M,Inf))
     function neg(x::Real) # test whether a number is
                           # genuinely negative (-0.0 isn't)
         return x < -ϵ
     end
-    prettystring(x::Bool;padding=false) = "\\mathrm{"*(x?"true":"false")*"}"
+    prettystring(x::Bool;padding=false) = "\\mathrm{"*(x ? "true" : "false")*"}"
     function prettystring(x::RatOrInt;padding=false)
         if isa(x,Integer)
             if padding
@@ -72,7 +75,7 @@ function texstring{T}(M::Array{T,2})
         elseif x.den == 1
             return prettystring(x.num,padding=padding)
         else
-            sgn = neg(x.num) ? "-" : (padding?"\\hphantom{-}":"")
+            sgn = neg(x.num) ? "-" : (padding ? "\\hphantom{-}" : "")
             return sgn*"\\frac{"*string(abs(x.num))*"}{"*string(x.den)*"}"
         end
     end
@@ -87,13 +90,13 @@ function texstring{T}(M::Array{T,2})
         elseif ~_isnonzero(z.re,[one(typeof(z.re))])
             return (abs(z.im) == 1 ? "" : prettystring(z.im))*"i"
         else
-            return prettystring(z.re)*(neg(z.im)?"-":"+")*prettystring(abs(z.im)*im)
+            return prettystring(z.re)*(neg(z.im) ? "-" : "+")*prettystring(abs(z.im)*im)
         end
     end
 
     s = "\$\\left[\\begin{array}{" * repeat("c",size(M,2)) * "}"
     global ALIGNMENT
-    columnpadding = T <: Real ? any(M .< -ϵ, 1) : repmat([false],size(M,2))
+    columnpadding = T <: Real ? any(M .< -ϵ, dims=1) : repmat([false],size(M,2))
 
     for i=1:size(M,1)
         for j=1:size(M,2)
@@ -109,26 +112,26 @@ function texstring{T}(M::Array{T,2})
     return s
 end
 
-texstring{T<:Real}(M::Array{T,1}) = texstring(reshape(M,(length(M),1)))
-texstring{T<:Real}(M::RowVector{T}) = texstring(convert(Array{T,2},M))
+texstring(M::Array{T,1}) where T<:Real = texstring(reshape(M,(length(M),1)))
+texstring(M::RowVector{T}) where T<:Real = texstring(convert(Array{T,2},M))
 
-show{T<:Real}(io::IO,
-              ::MIME"text/latex",
-              s::Array{T,2}) = write(io, texstring(s))
+show(io::IO,
+     ::MIME"text/latex",
+     s::Array{T,2}) where T <: Real = write(io, texstring(s))
 
-show{T<:Real}(io::IO,
-              ::MIME"text/latex",
-              s::Array{T,1}) = write(io, texstring(s))
+show(io::IO,
+     ::MIME"text/latex",
+     s::Array{T,1}) where T <: Real = write(io, texstring(s))
 
-show{T<:Complex}(io::IO,
-                 ::MIME"text/latex",
-                 s::Array{T,2}) = write(io, texstring(s))
+show(io::IO,
+     ::MIME"text/latex",
+     s::Array{T,2}) where T <: Complex = write(io, texstring(s))
 
-show{T<:Complex}(io::IO,
-                 ::MIME"text/latex",
-                 s::Array{T,1}) = write(io, texstring(s))
+show(io::IO,
+     ::MIME"text/latex",
+     s::Array{T,1}) where T <: Complex = write(io, texstring(s))
 
-type EigenSpace
+struct EigenSpace
     λ
     mult
     eigenmatrix
@@ -194,7 +197,7 @@ julia> rowswitch(M,1,2)
  1//1  2//1  3//1
 ```
 """
-function rowswitch{T}(M::Array{T,2},i::Integer,j::Integer)
+function rowswitch(M::Array{T,2},i::Integer,j::Integer) where T 
     A = copy(M)
     A[i,:], A[j,:] = A[j,:], A[i,:]
     return A
@@ -214,7 +217,7 @@ julia> rowscale(M,1,16)
   4   5   6
 ```
 """
-function rowscale{T}(M::Array{T,2},i::Integer,x)
+function rowscale(M::Array{T,2},i::Integer,x) where T 
     A = copy(convert(Array{promote_type(T,typeof(x)),2},M))
     A[i,:] *= x
     return A
@@ -234,10 +237,10 @@ julia> rowadd(M,1,2,-1)
   4   5   6
 ```
 """
-function rowadd{T}(M::Array{T,2},
-                   i::Integer,
-                   j::Integer,
-                   x)
+function rowadd(M::Array{T,2},
+                i::Integer,
+                j::Integer,
+                x) where T 
     A = copy(convert(Array{promote_type(T,typeof(x)),2},M))
     A[i,:] += x*A[j,:]
     return A
@@ -249,7 +252,7 @@ end
 Version of `rowswitch` that modifies the argument rather than 
 returning a new matrix
 """
-function rowswitch!{T}(M::Array{T,2},i::Integer,j::Integer)
+function rowswitch!(M::Array{T,2},i::Integer,j::Integer) where T 
     if i == j
         return nothing
     else
@@ -264,7 +267,7 @@ end
 Version of `rowscale` that modifies the argument rather than 
 returning a new matrix
 """
-function rowscale!{T}(M::Array{T,2},i::Integer,x)
+function rowscale!(M::Array{T,2},i::Integer,x) where T 
     M[i,:] *= x
     return nothing
 end
@@ -275,7 +278,7 @@ end
 Version of `rowadd` that modifies the argument rather than 
 returning a new matrix
 """
-function rowadd!{T}(M::Array{T,2},i::Integer,j::Integer,x)
+function rowadd!(M::Array{T,2},i::Integer,j::Integer,x) where T 
     M[i,:] += x*M[j,:]
     return nothing
 end
@@ -288,7 +291,7 @@ and floats count as zero whenever their absolute value
 is less than roundoff error for floats the size of the 
 norm of M. 
 """
-function _isnonzero{T}(x,M::Array{T})
+function _isnonzero(x,M::Array{T}) where T 
     if isa(x,AbstractFloat) || (isa(x,Complex) && isa(x.re,AbstractFloat))
         ϵ = T <: AbstractFloat ? eps(norm(M,Inf)) : eps(typeof(x))
         return abs(x) > ϵ
@@ -296,8 +299,8 @@ function _isnonzero{T}(x,M::Array{T})
         return x != 0
     end
 end
-eps{T}(::Type{Complex{T}}) = 3*eps(T)
-eps{T<:AbstractFloat}(z::Complex{T}) = 3*(eps(z.re) + eps(z.im))
+eps(::Type{Complex{T}}) where T = 3*eps(T)
+eps(z::Complex{T}) where T <: AbstractFloat = 3*(eps(z.re) + eps(z.im))
 
 simplify(x) = isa(x,Real) ? x :
     (string(typeof(x)) == "SymPy.Sym" ? symplify(x) : x)
@@ -329,7 +332,7 @@ julia> rref(M;showsteps=true)
  Rational{Int64}[1//1 0//1 -1//1; 0//1 1//1 2//1] 
 ```
 """
-function rref{T}(M::Array{T,2};showsteps=false)
+function rref(M::Array{T,2};showsteps=false) where T 
     isnonzero(x) = _isnonzero(x,M)
     S = T <: Rational ? T.parameters[1] : T
     if T <: RatOrInt
@@ -400,7 +403,7 @@ julia> M
  3//2  0//1  -3//2
 ```
 """
-function zerooutbelow!{T}(M::Array{T,2},i::Integer,j::Integer)::Void
+function zerooutbelow!(M::Array{T,2},i::Integer,j::Integer)::Nothing where T
     for k=i+1:size(M,1)
         rowadd!(M,k,i,T<:RatOrInt ? -M[k,j]//M[i,j] : -M[k,j]/M[i,j])
     end
@@ -423,7 +426,7 @@ julia> M
   4//1  5//1  6//1
 ```
 """
-function zerooutabove!{T}(M::Array{T,2},i::Integer,j::Integer)::Void
+function zerooutabove!(M::Array{T,2},i::Integer,j::Integer)::Nothing where T 
     for k=1:i-1
         rowadd!(M,k,i,T<:RatOrInt ? -M[k,j]//M[i,j] : -M[k,j]/M[i,j])
     end
@@ -445,14 +448,14 @@ julia> M
  1//1  5//4  3//2
 ```
 """
-function rownormalize!{T}(M::Array{T,2},i::Integer)::Void
+function rownormalize!(M::Array{T,2},i::Integer)::Nothing where T
     isnonzero(x) = _isnonzero(x,M)
     j = findfirst(isnonzero.(M[i,:]))
     rowscale!(M,i, T<:RatOrInt ? 1//M[i,j] : 1/M[i,j])
     return nothing
 end
 
-function inv{T<:Integer}(A::Union{Array{Rational{T},2},Array{T,2}})
+function inv(A::Union{Array{Rational{T},2},Array{T,2}}) where T <: Integer
     if size(A,1) != size(A,2)
         error("Matrix not square")
     end
@@ -496,7 +499,7 @@ julia> eigenvalues(M)
 ⎣-2⋅√3 + 3⎦
 ```
 """
-function eigenvalues{T}(A::Array{T,2})
+function eigenvalues(A::Array{T,2}) where T 
     _loadsympy()
     return SymPy.solve(charpoly(A))
 end
@@ -510,7 +513,7 @@ Use SymPy to find the exact eigenvalues of M
 julia> M = [1 2; 4 5]
 julia> eigenspaces(M)
 eigenspace(
-λ = 3 + 2 \sqrt{3}, mult = 1, 
+λ = 3 + 2 \\sqrt{3}, mult = 1, 
 ⎡  1   √3⎤
 ⎢- ─ + ──⎥
 ⎢  2   2 ⎥
@@ -519,7 +522,7 @@ eigenspace(
 )
 
 eigenspace(
-λ = - 2 \sqrt{3} + 3, mult = 1, 
+λ = - 2 \\sqrt{3} + 3, mult = 1, 
 ⎡  √3   1⎤
 ⎢- ── - ─⎥
 ⎢  2    2⎥
@@ -528,7 +531,7 @@ eigenspace(
 )
 ```
 """
-function eigenspaces{T}(A::Array{T,2})
+function eigenspaces(A::Array{T,2}) where T 
     _loadsympy()
     B = map(x->convert(SymPy.Sym,x),A)
     return [EigenSpace(a,b,map(SymPy.simplify,hcat(c...))) for
@@ -545,7 +548,7 @@ julia> M = [1 2; 4 5]
 julia> charpoly(M)
 ```
 """
-function charpoly{T}(A::Array{T,2})
+function charpoly(A::Array{T,2}) where T 
     _loadsympy()
     λ = SymPy.symbols("lambda")
     B = map(x->convert(SymPy.Sym,x),A)
@@ -558,12 +561,12 @@ end
 
 function _loadgraphics()
     try
-        Pkg.installed("Graphics2D")
+        "AsyPlots" in keys(Pkg.installed())
     catch
-        error("Run Pkg.clone(\"git://github.com/sswatson/Graphics2D.jl.git\")")
+        error("""Run Pkg.add("AsyPlots")""")
     end
     @eval begin
-        import Graphics2D
+        import AsyPlots
     end
 end
 
@@ -582,7 +585,7 @@ julia> @manipulate for i=1:length(movie)
        end
 ```
 """
-transformation_movie{T}(A::Array{T,2};kwargs...) =
+transformation_movie(A::Array{T,2};kwargs...) where T =
     transformation_movie((x,y)->A*[x;y];kwargs...)
 
 function transformation_movie(f::Function;
@@ -593,20 +596,53 @@ function transformation_movie(f::Function;
 
     _loadgraphics()
 
-    Line = Graphics2D.Line
-    Point = Graphics2D.Point
+    Path = AsyPlots.Path
+    Point = AsyPlots.Point
+    NamedColor = AsyPlots.NamedColor
 
-    m = 1.05*max(norm(f(n,n),Inf),norm(f(-n,n),Inf))
-    box = Line([-m -m; m -m; m m; -m m; -m -m];color="white")
-    return [vcat([[Line([(1-t)*[j,k] + t*f(j,k) for j=-n:0.1:n];
-                        linewidth=3,color=0.9*"red") for k=-n:n];
-                  [Line([(1-t)*[j,k] + t*f(j,k) for k=-n:0.1:n];
-                        linewidth=3,color=0.9*"blue") for j=-n:n];
-                  [Point((1-t)*[1,4] + t*f(1,4),
-                         pointsize=1e-2,color=0.5*"green")];
-                  [Point(0,0;pointsize=1e-2)];
-                  [box]]...)
-            for t=linspace(0,1,frames)]
+    mypath(A::Array{<:Real,2};kwargs...) = Path([tuple(A[k,:]...) for k=1:size(A,1)];kwargs...)
+    mypath(A::Array{T,1};kwargs...) where T = Path([tuple(v...) for v in A];kwargs...)
+    sc(r::Real,s::String) = r*NamedColor(s)
+
+    m = 2.05*max(norm(f(n,n),Inf),norm(f(-n,n),Inf))
+    box = mypath([-m -m; m -m; m m; -m m; -m -m];color="white")
+    return [AsyPlots.Plot(vcat([[Path([0 0; m 0]),Path([0 0; m 0])];
+                                [mypath([(1-t)*[j,k] + t*f(j,k) for j=-n:0.1:n];
+                        linewidth=1.5,color=sc(0.9,"DarkRed")) for k=-n:n];
+                  [mypath([(1-t)*[j,k] + t*f(j,k) for k=-n:0.1:n];
+                        linewidth=1.5,color=sc(0.9,"MidnightBlue")) for j=-n:n];
+                  [Point(0,0;linewidth=1e-2)];
+                  [box]]...))
+            for t=range(0,stop=1,length=frames)]
+end
+
+function svdviz(A::Array{T,2},B::Array{T,2}=A;n=5,frames=20,gridlinewidth=1,graylinewidth=1,pointsize=1,kwargs...) where T <: Real
+
+    _loadgraphics()
+
+    Path = AsyPlots.Path
+    Point = AsyPlots.Point
+    Arrow = AsyPlots.Arrow
+    Plot = AsyPlots.Plot
+    
+    U, Σ, V = svd(A)
+    m = 1.05*max(norm(A*V*[n,n],Inf),norm(A*V*[-n,n],Inf),norm(A*V*[-n,-n],Inf))
+    mybox = Path([-m -m; m -m; m m; -m m; -m -m];color="white")
+    loc(j,k,t) = tuple((j*B*V[:,1] + k*B*V[:,2])*t + (j*V[:,1] + k*V[:,2])*(1-t)...)
+    pts(t) = vcat([Point(loc(j,k,t);linewidth=pointsize) for j=-n:n,k=-n:n]...)
+    bluelines(t) = [Path([loc(j,k,t) for j=-n:n];linewidth=gridlinewidth,color="MidnightBlue") for k=-n:n]
+    redlines(t) = [Path([loc(j,k,t) for k=-n:n];linewidth=gridlinewidth,color="DarkRed") for j=-n:n]
+    graylines = [[Path([(j,k) for j=-n:n];color="Gray",linewidth=graylinewidth,opacity=0.3) for k=-n:n];
+                 [Path([(j,k) for k=-n:n];color="Gray",linewidth=graylinewidth,opacity=0.3) for j=-n:n]]
+    axes = [Path([0 0; 0 m]),Path([0 0; m 0])]
+    basisvectors(t) = [Path([(0,0),tuple([1,0]*(1-t) + A*[1,0]*(t)...)];arrow=Arrow(),linewidth=1.5,color="SeaGreen"),
+                        Path([(0,0),tuple([0,1]*(1-t) + A*[0,1]*(t)...)];arrow=Arrow(),linewidth=1.5,color="DarkRed")]
+    [Plot([graylines;
+           basisvectors(t);
+           bluelines(t);
+           redlines(t);
+           pts(t);
+           [mybox]];kwargs...) for t = range(0,stop=1,length=frames)]
 end
 
 end # module
