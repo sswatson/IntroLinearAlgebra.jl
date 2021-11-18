@@ -113,7 +113,7 @@ function texstring(M::AbstractArray{T,2}) where T
 end
 
 texstring(M::AbstractArray{T,1}) where T<:Real = texstring(reshape(M,(length(M),1)))
-texstring(M::RowVector{T}) where T<:Real = texstring(convert(Array{T,2},M))
+texstring(M::Adjoint{T, Vector{T}}) where T<:Real = texstring(convert(Array{T,2},M))
 
 show(io::IO,
      ::MIME"text/latex",
@@ -423,7 +423,7 @@ function __init__()
 
         symplify(x) = SymPy.simplify(x)
 
-        texstring(A::Array{SymPy.Sym}) = SymPy.sympy[:latex](A)
+        texstring(A::Array{SymPy.Sym}) = SymPy.sympy.latex(A)
 
         struct EigenSpace
             λ
@@ -493,8 +493,8 @@ function __init__()
         ```
         """
         function eigenvalues(A::Array{T,2}) where T 
-            _loadsympy()
-            return SymPy.solve(charpoly(A))
+            λ = SymPy.symbols("lambda")
+            return SymPy.solve(charpoly(A), λ)
         end
 
         """
@@ -527,7 +527,7 @@ function __init__()
         function eigenspaces(A::Array{T,2}) where T 
             B = map(x->convert(SymPy.Sym,x),A)
             return [EigenSpace(a,b,map(SymPy.simplify,hcat(c...))) for
-                    (a,b,c) in SymPy.getindex(B,:eigenvects)()]
+                    (a,b,c) in B.eigenvects()]
         end
 
         """
@@ -541,9 +541,8 @@ function __init__()
         ```
         """
         function charpoly(A::Array{T,2}) where T 
-            λ = SymPy.symbols("lambda")
-            B = map(x->convert(SymPy.Sym,x),A)
-            return SymPy.getindex(B,:charpoly)()(λ)
+            B = map(x->convert(SymPy.Sym,x), A)
+            return B.charpoly()
         end
         
     end

@@ -1,0 +1,10 @@
+name = "IntroLinearAlgebra"
+uuid = "bebe5673-90cd-4bb9-b802-c23159595cd8"
+authors = ["Samuel S. Watson"]
+version = "0.1.0"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+Requires = "ae029012-a4dd-5104-9daa-d747884805df"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
